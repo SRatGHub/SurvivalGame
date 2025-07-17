@@ -4,8 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Resources_M.h"
+#include "Kismet/GameplayStatics.h"
 #include "Camera/CameraComponent.h"
 #include "MyPlayer.generated.h"
+
+
 
 UCLASS()
 class SURVIVALGAME2_API AMyPlayer : public ACharacter
@@ -39,4 +43,38 @@ public:
 		void FindObject();
 	UPROPERTY(VisibleAnywhere)
 		UCameraComponent* PlayerCamComp;
+	
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Stats")
+		float Health = 100.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Stats")
+		float Hunger = 100.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player Stats")
+		float Stamina = 100.0f;
+	UFUNCTION(BlueprintCallable)
+		void SetHealth(float amount);
+	UFUNCTION(BlueprintCallable)
+		void SetHunger(float amount);
+	UFUNCTION()
+		void DecreaseStats();
+	UFUNCTION(BlueprintCallable)
+		void SetStamina(float amount);
+
+
+	UPROPERTY(EditAnywhere, Category = "Resources")
+		int Wood;
+	UPROPERTY(EditAnywhere, Category = "Resources")
+		int Stone;
+	UPROPERTY(EditAnywhere, Category = "Resources")
+		int Berry;
+	UPROPERTY(EditAnywhere, Category = "Resources")
+		TArray<FString> ResourcesNameArray;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Resources")
+		TArray<int> ResourcesArray;
+
+	UFUNCTION()
+		void GiveResource(float amount, FString resourceType);
+
+	UPROPERTY(EditAnywhere, Category = "HitMarker")
+	UMaterialInterface* hitdecal;
 };
