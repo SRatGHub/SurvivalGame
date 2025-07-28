@@ -8,12 +8,12 @@ AResources_M::AResources_M()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	//Create the skeletal mesh for the tree and the text in front of it.
 	ResourceNameText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Text Render"));
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 
 	RootComponent = Mesh;
-
+	
 	ResourceNameText->SetupAttachment(Mesh);
 
 
