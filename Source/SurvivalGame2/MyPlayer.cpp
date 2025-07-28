@@ -17,7 +17,11 @@ AMyPlayer::AMyPlayer()
 
 	//Share Rotation with Controller
 	PlayerCamComp->bUsePawnControlRotation = true;
-
+	
+	//Set the Building Array
+	BuildingArray.SetNum(3);
+	
+	//Set the Resources array
 	ResourcesArray.SetNum(3);
 	ResourcesNameArray.Add(TEXT("Wood"));
 	ResourcesNameArray.Add(TEXT("Stone"));
@@ -40,6 +44,16 @@ void AMyPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (isBuilding)
+	{
+		if (spawnedPart) {
+			FVector StartLocation = PlayerCamComp->GetComponentLocation();
+			FVector Direction = PlayerCamComp->GetForwardVector() * 400.0f;
+			FVector EndLocation = StartLocation + Direction;
+			spawnedPart->SetActorLocation(EndLocation);
+		}
+	}
+
 }
 
 // Called to bind functionality to input
@@ -55,6 +69,7 @@ void AMyPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	PlayerInputComponent->BindAction("JumpEvent", IE_Released, this, &AMyPlayer::StopJump);
 
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyPlayer::FindObject);
+	PlayerInputComponent->BindAction("Rot Part", IE_Pressed, this, &AMyPlayer::RotateBuilding);
 }
 
 
@@ -69,7 +84,7 @@ void AMyPlayer::StopJump()
 }
 
 void AMyPlayer::FindObject()
-{
+{//Line trace for object interaction
 	FHitResult HitResult;
 	FVector StartLocation = PlayerCamComp->GetComponentLocation();
 	FVector Direction = PlayerCamComp->GetForwardVector() * 800.0f;
@@ -80,13 +95,57 @@ void AMyPlayer::FindObject()
 	QueryParams.bTraceComplex = true;
 	QueryParams.bReturnFaceIndex = true;
 
+
+	if (isBuilding)
+	{
+		if (GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, QueryParams))
+		{
+			AResources_M* HitResource = Cast<AResources_M>(HitResult.GetActor());
+
+			if (Stamina > 5.0f)
+			{
+				
+				
+				if (HitResource)
+				{
+					FString hitName = HitResource->resourceName;
+					int resourceValue = HitResource->resourceAmount;
+
+					HitResource->totalResource = HitResource->totalResource - resourceValue;
+
+					if (HitResource->totalResource > resourceValue)
+					{
+						GiveResource(resourceValue, hitName);
+
+						//Causes the decal to appear when the player hits a resource
+						check(GEngine != nullptr);
+						GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Collected"));
+
+						UGameplayStatics::SpawnDecalAtLocation(GetWorld(), hitdecal, FVector(10.0f, 10.0f, 10.0f), HitResult.Location, FRotator(-90, 0, 0), 2.0f);
+
+						SetStamina(-5.0f);
+					}
+					else
+					{
+						HitResource->Destroy();
+						check(GEngine != nullptr);
+						GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Depleted"));
+					}
+				}
+			}
+		}
+	}
+
+	else
+	{
+		isBuilding = false;
+	}
 	if (GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, QueryParams))
 	{
 		AResources_M* HitResource = Cast<AResources_M>(HitResult.GetActor());
 
 		if (Stamina > 5.0f)
 		{
-
 
 
 			if (HitResource)
@@ -100,6 +159,7 @@ void AMyPlayer::FindObject()
 				{
 					GiveResource(resourceValue, hitName);
 
+					//Causes the decal to appear when the player hits a resource
 					check(GEngine != nullptr);
 					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Collected"));
 
@@ -117,7 +177,7 @@ void AMyPlayer::FindObject()
 		}
 	}
 }
-
+//Sets the Health
 void AMyPlayer::SetHealth(float amount)
 {
 	if (Health + amount < 100)
@@ -125,14 +185,14 @@ void AMyPlayer::SetHealth(float amount)
 		Health = Health + amount;
 	}
 }
-
+/*Sets the Hunger*/
 void AMyPlayer::SetHunger(float amount)
 {
 	if (Hunger + amount < 100) {
 		Hunger = Hunger + amount;
 	}
 }
-
+//Decreases the hunger value over time
 void AMyPlayer::DecreaseStats()
 {
 	if (Hunger > 0)
@@ -141,13 +201,13 @@ void AMyPlayer::DecreaseStats()
 	}
 	
 	SetStamina(10.0f);
-
+	//If hunger reaches zero the health decreases
 	if (Hunger <=0)
 	{
 		SetHealth(-3.0f);
 	}
 }
-
+//Sets the stamina value
 void AMyPlayer::SetStamina(float amount)
 {
 	if (Stamina + amount < 100)
@@ -155,7 +215,7 @@ void AMyPlayer::SetStamina(float amount)
 		Stamina = Stamina + amount;
 	}
 }
-
+//Puts resources within an array
 void AMyPlayer::GiveResource(float amount, FString resourceType)
 {
 	if (resourceType == "Wood")
@@ -169,6 +229,60 @@ void AMyPlayer::GiveResource(float amount, FString resourceType)
 	if (resourceType == "Berry")
 	{
 		ResourcesArray[2] = ResourcesArray[2] + amount;
+	}
+}
+
+void AMyPlayer::UpdateResources(float woodAmount, float stoneAmount, FString buildingObject)
+{
+	if (woodAmount <= ResourcesArray[0])
+	{
+		if (stoneAmount <= ResourcesArray[1]) {
+			ResourcesArray[0] = ResourcesArray[0] - woodAmount;
+			ResourcesArray[1] = ResourcesArray[1] - stoneAmount;
+
+			if (buildingObject == "Wall") {
+				BuildingArray[0] = BuildingArray[0] + 1.0f;
+			}
+			if (buildingObject == "Floor")
+			{
+				BuildingArray[1] = BuildingArray[1] + 1.0f;
+			}
+			if (buildingObject == "Ceiling")
+			{
+				BuildingArray[2] = BuildingArray[2] + 1.0f;
+			}
+		}
+	}
+}
+
+void AMyPlayer::SpawnBuilding(int buildingID, bool& isSuccess)
+{
+	if (isBuilding)
+	{
+		if (BuildingArray[buildingID] >= 1) {
+			isBuilding = true;
+			FActorSpawnParameters SpawnParams;
+			FVector StartLocation = PlayerCamComp->GetComponentLocation();
+			FVector Direction = PlayerCamComp->GetForwardVector() * 400.0f;
+			FVector EndLocation = StartLocation + Direction;
+			FRotator myRot(0, 0, 0);
+
+			BuildingArray[buildingID] = BuildingArray[buildingID] - 1;
+
+			spawnedPart = GetWorld()->SpawnActor<ABuildingPart>(BuildPartClass, EndLocation, myRot, SpawnParams);
+
+			isSuccess = true;
+		}
+
+		isSuccess = false;
+	}
+}
+
+void AMyPlayer::RotateBuilding()
+{
+	if (isBuilding)
+	{
+		spawnedPart->AddActorWorldRotation(FRotator(0, 90, 0));
 	}
 }
 
