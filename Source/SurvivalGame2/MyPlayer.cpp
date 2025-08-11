@@ -27,6 +27,9 @@ AMyPlayer::AMyPlayer()
 	ResourcesNameArray.Add(TEXT("Stone"));
 	ResourcesNameArray.Add(TEXT("Berry"));
 
+	isBuilding = true;
+	spawnedPart = nullptr;
+
 }
 
 // Called when the game starts or when spawned
@@ -44,16 +47,17 @@ void AMyPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (isBuilding)
+	if (isBuilding && spawnedPart)
 	{
-		if (spawnedPart) {
-			FVector StartLocation = PlayerCamComp->GetComponentLocation();
-			FVector Direction = PlayerCamComp->GetForwardVector() * 400.0f;
-			FVector EndLocation = StartLocation + Direction;
-			spawnedPart->SetActorLocation(EndLocation);
-		}
+		FVector StartLocation = PlayerCamComp->GetComponentLocation();
+		FVector Direction = PlayerCamComp->GetForwardVector() * 400.0f;
+		FVector EndLocation = StartLocation + Direction;
+		spawnedPart->SetActorLocation(EndLocation);
 	}
+	else
+	{
 
+	}
 }
 
 // Called to bind functionality to input
@@ -70,6 +74,7 @@ void AMyPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyPlayer::FindObject);
 	PlayerInputComponent->BindAction("Rot Part", IE_Pressed, this, &AMyPlayer::RotateBuilding);
+	PlayerInputComponent->BindAction("PlaceBuilding", IE_Pressed, this, &AMyPlayer::PlaceBuilding);
 }
 
 
@@ -95,7 +100,42 @@ void AMyPlayer::FindObject()
 	QueryParams.bTraceComplex = true;
 	QueryParams.bReturnFaceIndex = true;
 
+	if (GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, QueryParams))
+	{
+		AResources_M* HitResource = Cast<AResources_M>(HitResult.GetActor());
 
+		if (Stamina > 5.0f)
+		{
+
+
+			if (HitResource)
+			{
+				FString hitName = HitResource->resourceName;
+				int resourceValue = HitResource->resourceAmount;
+
+				HitResource->totalResource = HitResource->totalResource - resourceValue;
+
+				if (HitResource->totalResource > resourceValue)
+				{
+					GiveResource(resourceValue, hitName);
+
+					//Causes the decal to appear when the player hits a resource
+					check(GEngine != nullptr);
+					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Collected"));
+
+					UGameplayStatics::SpawnDecalAtLocation(GetWorld(), hitdecal, FVector(10.0f, 10.0f, 10.0f), HitResult.Location, FRotator(-90, 0, 0), 2.0f);
+
+					SetStamina(-5.0f);
+				}
+				else
+				{
+					HitResource->Destroy();
+					check(GEngine != nullptr);
+					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Depleted"));
+				}
+			}
+		}
+	}
 	if (isBuilding)
 	{
 		if (GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, QueryParams))
@@ -140,42 +180,7 @@ void AMyPlayer::FindObject()
 	{
 		isBuilding = false;
 	}
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, QueryParams))
-	{
-		AResources_M* HitResource = Cast<AResources_M>(HitResult.GetActor());
-
-		if (Stamina > 5.0f)
-		{
-
-
-			if (HitResource)
-			{
-				FString hitName = HitResource->resourceName;
-				int resourceValue = HitResource->resourceAmount;
-
-				HitResource->totalResource = HitResource->totalResource - resourceValue;
-
-				if (HitResource->totalResource > resourceValue)
-				{
-					GiveResource(resourceValue, hitName);
-
-					//Causes the decal to appear when the player hits a resource
-					check(GEngine != nullptr);
-					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Collected"));
-
-					UGameplayStatics::SpawnDecalAtLocation(GetWorld(), hitdecal, FVector(10.0f, 10.0f, 10.0f), HitResult.Location, FRotator(-90, 0, 0), 2.0f);
-
-					SetStamina(-5.0f);
-				}
-				else
-				{
-					HitResource->Destroy();
-					check(GEngine != nullptr);
-					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Resource Depleted"));
-				}
-			}
-		}
-	}
+	
 }
 //Sets the Health
 void AMyPlayer::SetHealth(float amount)
@@ -232,6 +237,17 @@ void AMyPlayer::GiveResource(float amount, FString resourceType)
 	}
 }
 
+void AMyPlayer::PlaceBuilding()
+{
+	if (isBuilding && spawnedPart)
+	{
+		spawnedPart = nullptr;
+		isBuilding = false;
+	}
+}
+
+
+
 void AMyPlayer::UpdateResources(float woodAmount, float stoneAmount, FString buildingObject)
 {
 	if (woodAmount <= ResourcesArray[0])
@@ -266,16 +282,18 @@ void AMyPlayer::SpawnBuilding(int buildingID, bool& isSuccess)
 			FVector Direction = PlayerCamComp->GetForwardVector() * 400.0f;
 			FVector EndLocation = StartLocation + Direction;
 			FRotator myRot(0, 0, 0);
-
+			
 			BuildingArray[buildingID] = BuildingArray[buildingID] - 1;
-
+			
 			spawnedPart = GetWorld()->SpawnActor<ABuildingPart>(BuildPartClass, EndLocation, myRot, SpawnParams);
-
+			
 			isSuccess = true;
 		}
 
-		isSuccess = false;
-	}
+			else
+			{
+				isSuccess = false;
+			}
 }
 
 void AMyPlayer::RotateBuilding()

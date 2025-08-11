@@ -76,6 +76,8 @@ public:
 	UFUNCTION()
 		void GiveResource(float amount, FString resourceType);
 
+		
+
 //Creates a Hit Marker for when the player clicks on a resource mesh.
 	UPROPERTY(EditAnywhere, Category = "HitMarker")
 		UMaterialInterface* hitdecal;
@@ -95,6 +97,8 @@ public:
 	UPROPERTY()
 		ABuildingPart* spawnedPart;
 
+	UFUNCTION(BlueprintCallable)
+		void PlaceBuilding();
 
 	UFUNCTION(BlueprintCallable)
 		void UpdateResources(float woodAmount, float stoneAmount, FString buildingObject);
